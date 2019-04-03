@@ -24,11 +24,17 @@ def val(model, word_embeds, device, X_val, y_val):
     target_list = []
     for sentence, tags in zip(X_val, y_val):
         sentence = torch.tensor(sentence).long().to(device)
-        lstm_feats, lstm_sofmax = model(word_embeds, sentence)
+        tags = torch.tensor(tags).unsqueeze(0).long().to(device)
+
+        lstm_feats, lstm_softmax = model(word_embeds, sentence)
         # TODO for genres need special one
-        predict = torch.argmax(lstm_sofmax[-1].unsqueeze(0), dim=1)
-        predict_list.append(predict.tolist())
-        target_list.append([tags])
+        for i in range(tags.shape[0]):
+            tag = tags[i].unsqueeze(0)
+
+            predict = torch.argmax(lstm_softmax[-1].unsqueeze(0), dim=1)
+            predict_list.append(predict.tolist())
+            target_list.append([tag])
+
 
     binarizer = MultiLabelBinarizer()
     binarizer.fit_transform([[x for x in range(model.output_size)]])
@@ -53,7 +59,7 @@ def lstm_train(word2id,
           tag_prepared,
           HIDDEN_DIM=4,):
 
-    model = FacetTracker(tag2id, HIDDEN_DIM,word_embeddings[0].size).to(device)
+    model = FacetTracker(tag2id, HIDDEN_DIM, word_embeddings[0].size).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     criterion = nn.CrossEntropyLoss()
     word_embeds = word_embeds.to(device)
@@ -78,7 +84,7 @@ def lstm_train(word2id,
             sentence = torch.tensor(sentence).long().to(device)
             tags = torch.tensor(tags).unsqueeze(0).long().to(device)
 
-            lstm_feats, lstm_sofmax = model(word_embeds, sentence)
+            lstm_feats, lstm_softmax = model(word_embeds, sentence)
 
             # for genres need multi-tags update
             lstm_last = lstm_feats[-1].unsqueeze(0)
