@@ -24,6 +24,8 @@ def val(model, word_embeds, device, X_val, y_val):
     target_list = []
     for sentence, tags in zip(X_val,y_val):
         sentence = torch.tensor(sentence).long().to(device)
+        tags = torch.tensor(tags).unsqueeze(0).long().to(device)
+
         lstm_feats, lstm_sofmax = model(word_embeds, sentence)
 
         lstm_last = lstm_sofmax[-1].unsqueeze(0)
