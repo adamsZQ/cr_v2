@@ -22,18 +22,13 @@ from torch import nn
 def val(model, word_embeds, device, X_val, y_val):
     predict_list = []
     target_list = []
-    for sentence, tags in zip(X_val,y_val):
+    for sentence, tags in zip(X_val, y_val):
         sentence = torch.tensor(sentence).long().to(device)
-        tags = torch.tensor(tags).unsqueeze(0).long().to(device)
-
         lstm_feats, lstm_sofmax = model(word_embeds, sentence)
-
-        lstm_last = lstm_sofmax[-1].unsqueeze(0)
-        for i in range(tags.shape[0]):
-            tag = tags[i].unsqueeze(0)
-            predict = torch.argmax(lstm_last[-1].unsqueeze(0), dim=1)
-            predict_list.append(predict.tolist())
-            target_list.append([tag])
+        # TODO for genres need special one
+        predict = torch.argmax(lstm_sofmax[-1].unsqueeze(0), dim=1)
+        predict_list.append(predict.tolist())
+        target_list.append([tags])
 
     binarizer = MultiLabelBinarizer()
     binarizer.fit_transform([[x for x in range(model.output_size)]])
@@ -167,7 +162,7 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = '~/cr_repo/'
     if model_type is None:
-        model_type = 'test3'
+        model_type = 'test1'
     if boundary_tags is None:
         boundary_tags = True
 
