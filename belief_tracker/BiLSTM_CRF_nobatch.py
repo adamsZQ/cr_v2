@@ -89,6 +89,7 @@ class BiLSTM_CRF(nn.Module):
         self.hidden = self.init_hidden()
 
         self.embedding = None
+
     def init_hidden(self):
         return (torch.randn(2, 1, self.hidden_dim // 2),
                 torch.randn(2, 1, self.hidden_dim // 2))
@@ -194,7 +195,6 @@ class BiLSTM_CRF(nn.Module):
         feats = self._get_lstm_features(word_embeds, sentence)
         forward_score = self._forward_alg(feats)
         gold_score = self._score_sentence(feats, tags)
-        #print(prof)
         return forward_score - gold_score
 
     '''
