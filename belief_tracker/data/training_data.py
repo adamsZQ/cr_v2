@@ -10,8 +10,7 @@ def get_training_data(file_prefix, data_path):
             sentence = data_json['key'].split()
             data.append(sentence)
 
-            # TODO multi-tags
-            tag = data_json['value']
+            tag = data_json['tags']
             tags.append(tag)
     return data, tags
 

@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 import torch.utils.data as Data
 from torch import nn, optim
 
-from belief_tracker.lstm import load_model
+from useless.lstm import load_model
 from policy.policy_rl import Policy
 from policy.pretrain.prepare_data import prepare_data
 from tools.save_model import torch_save_model

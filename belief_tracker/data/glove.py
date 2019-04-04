@@ -46,13 +46,13 @@ class Glove_Embeddings():
             for line in d:
                 data_json = json.loads(line)
                 sentence = data_json['key'].split()
-                tags = data_json['value']
+                tags = data_json['tags']
                 for voca in sentence:
                     if voca not in task_vocab:
                         task_vocab.append(voca)
-
-                if tags not in task_tags:
-                    task_tags.append(tags)
+                for tag in tags:
+                    if tag not in task_tags:
+                        task_tags.append(tag)
 
         # add start, stop, padding and unk
         task_tags.append(START_TAG)

@@ -9,7 +9,7 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 from belief_tracker.data.glove import Glove_Embeddings
 from belief_tracker.data.training_data import get_training_data
-from belief_tracker.lstm import FacetTracker
+from useless.lstm import FacetTracker
 from tools.save_model import torch_save_model
 
 import argparse
@@ -27,24 +27,23 @@ def val(model, word_embeds, device, X_val, y_val):
         tags = torch.tensor(tags).unsqueeze(0).long().to(device)
 
         lstm_feats, lstm_softmax = model(word_embeds, sentence)
-        # TODO for genres need special one
         for i in range(tags.shape[0]):
             tag = tags[i].unsqueeze(0)
 
             predict = torch.argmax(lstm_softmax[-1].unsqueeze(0), dim=1)
             predict_list.append(predict.tolist())
-            target_list.append([tag])
+            target_list.append(tag.tolist())
 
-
+    # print( set(sum(target_list, [])) - set(sum(predict_list, [])))
     binarizer = MultiLabelBinarizer()
-    binarizer.fit_transform([[x for x in range(model.output_size)]])
+    binarizer.fit_transform([x for x in target_list])
     target_list = binarizer.transform(target_list)
     predict_list = binarizer.transform(predict_list)
 
     accuracy = accuracy_score(target_list, predict_list)
-    f1 = f1_score(target_list, predict_list, average="samples")
-    precision = precision_score(target_list, predict_list, average="samples")
-    recall = recall_score(target_list, predict_list, average="samples")
+    f1 = f1_score(target_list, predict_list, average="weighted")
+    precision = precision_score(target_list, predict_list, average="macro")
+    recall = recall_score(target_list, predict_list, average="macro")
 
     return accuracy, precision, recall, f1
 
@@ -148,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument("--boundary_tags") # add START END tags
     args = parser.parse_args()
 
-    HIDDEN_DIM = 4
+    HIDDEN_DIM = 20
     FILE_PREFIX = args.prefix
     model_type = args.model
     bf_prefix = 'bf/'
@@ -168,7 +167,7 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = '~/cr_repo/'
     if model_type is None:
-        model_type = 'test1'
+        model_type = 'test3'
     if boundary_tags is None:
         boundary_tags = True
 
