@@ -230,11 +230,12 @@ def bilstm_train(word2id,
 
     global device_enable
     device_enable = device
+    # model =load_m(model_prefix + 'bilstm_crf_0.0789.pkl')
     model = BiLSTM_CRF(len(word2id), tag2id, word_embeddings[0].size, HIDDEN_DIM).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
-
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.8, random_state=2,
+    # word_embeds = model.embedding
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.999, random_state=2,
                                                         shuffle=True)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0, shuffle=True)
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)
@@ -276,5 +277,11 @@ def bilstm_train(word2id,
     torch_save_model(model_prefix, file_name, enforcement=True)
 
 
+def load_model(model_path):
+    model = torch.load(model_path)
+    # freeze model parameters
+    for parameter in model.parameters():
+        parameter.requires_grad = False
 
+    return model
 
