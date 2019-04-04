@@ -88,6 +88,7 @@ class BiLSTM_CRF(nn.Module):
 
         self.hidden = self.init_hidden()
 
+        self.embedding = None
     def init_hidden(self):
         return (torch.randn(2, 1, self.hidden_dim // 2),
                 torch.randn(2, 1, self.hidden_dim // 2))
@@ -196,6 +197,9 @@ class BiLSTM_CRF(nn.Module):
         #print(prof)
         return forward_score - gold_score
 
+    '''
+        tag_seq:[0,0,3,0,0]
+    '''
     def forward(self, word_embeds, sentence):  # dont confuse this with _forward_alg above.
         # Get the emission scores from the BiLSTM
         lstm_feats = self._get_lstm_features(word_embeds, sentence)
@@ -203,6 +207,7 @@ class BiLSTM_CRF(nn.Module):
         # Find the best path, given the features.
         score, tag_seq = self._viterbi_decode(lstm_feats)
         return score, tag_seq
+
 
 
 START_TAG = "<START>"
@@ -229,7 +234,7 @@ def bilstm_train(word2id,
     optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
 
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.9, random_state=2,
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.8, random_state=2,
                                                         shuffle=True)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0, shuffle=True)
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)
@@ -265,6 +270,7 @@ def bilstm_train(word2id,
                   'f1_score: {:.6f}'.format(f1))
             sys.stdout.flush()
 
+            model.embedding = word_embeds
             best_loss = torch_save_model(model, model_prefix, file_name, 1 - f1, best_loss)
 
     torch_save_model(model_prefix, file_name, enforcement=True)

@@ -19,7 +19,6 @@ def get_unk_token():
         unk = np.array(unk_str.split())
         unk = unk.astype(np.float)
     return unk
-    # print(unk)
 
 
 class Glove_Embeddings():
