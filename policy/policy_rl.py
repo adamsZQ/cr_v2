@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
+from tools.data_transfer import DataTool
+
 
 class Policy(nn.Module):
     def __init__(self, input_size, output_size, hidden_size=20):
@@ -12,7 +14,8 @@ class Policy(nn.Module):
         self.affine1 = nn.Linear(input_size, hidden_size)
         # hidden -> action
         self.affine2 = nn.Linear(hidden_size, output_size)
-
+        self.output_size = output_size
+        self.input_size = input_size
         self.saved_log_probs = []
         self.rewards = []
 
@@ -21,42 +24,62 @@ class Policy(nn.Module):
 
         self.gamma = 0.99
 
+        self.ReLU1 = nn.ReLU()
+        self.ReLU2 = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+
     def forward(self, x, train):
+        result = self.affine1(x)
+        result = self.ReLU1(result)
+        result = self.affine2(result)
+        result = self.ReLU2(result)
         if train:
-            # when training remove softmax
-            model = torch.nn.Sequential(
-                self.affine1,
-                # TODO 需要检验失活函数是否需要
-                # nn.Dropout(p=0.5),
-                nn.ReLU(),
-                self.affine2,
-                nn.ReLU(),
-            )
+            return result
         else:
-            # when predicting, put softmax back
-            model = torch.nn.Sequential(
-                self.affine1,
-                # TODO 需要检验失活函数是否需要
-                # nn.Dropout(p=0.5),
-                nn.ReLU(),
-                self.affine2,
-                nn.ReLU(),
-                nn.Softmax()
-            )
+            return self.softmax(result)
+        # if train:
+        #     # when training remove softmax
+        #     model = torch.nn.Sequential(
+        #         self.affine1,
+        #         # TODO 需要检验失活函数是否需要
+        #         # nn.Dropout(p=0.5),
+        #         nn.ReLU(),
+        #         self.affine2,
+        #         nn.ReLU(),
+        #     )
+        # else:
+        #     # when predicting, put softmax back
+        #     model = torch.nn.Sequential(
+        #         self.affine1,
+        #         # TODO 需要检验失活函数是否需要
+        #         # nn.Dropout(p=0.5),
+        #         nn.ReLU(),
+        #         self.affine2,
+        #         nn.ReLU(),
+        #         nn.Softmax(dim=1)
+        #     )
         return model(x)
 
     def select_action(self,state, device):
         # when training, activate this function
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-        probs = self(state, train=True)
+        # state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+        # state = state.unsqueeze(0)
+        probs = self(state, train=False)
+        # print('probs', probs)
         m = Categorical(probs)
-        action = m.sample()
+        try:
+            action = m.sample()
+        except Exception as e:
+            print(e)
+            print('state', state)
+            print('probs', probs)
         self.saved_log_probs.append(m.log_prob(action))
         return action.item()
 
     def select_best_action(self,state, device):
         # when predicting, activate this function
-        state = torch.from_numpy(state).float().unsqueeze(0)
+        # state = torch.from_numpy(state).float().unsqueeze(0)
+        # state = state.unsqueeze(0)
         probs = self(state, train=False)
         action = torch.argmax(probs, dim=1).tolist()
         return action[0]
@@ -94,30 +117,30 @@ class Policy(nn.Module):
         self.rewards.append(reward)
 
 
-if __name__ == '__main__':
-    state1 = np.array([-1,-1,-1,-1, -1])
-    state2 = np.array([57,-1,-1,-1, -1])
-    state3 = np.array([-1,-1,-1,-1, -1])
-    # state = torch.from_numpy(state).float().unsqueeze(0)
-
-    FILE_PREFIX = '/path/mv/model/'
-    file_name = 'policy_pretrain_0.7437.pkl'
-    model = torch.load(FILE_PREFIX + file_name)
-
-    a = torch.tensor(state1).float()
-    b = a.std()
-    mean = a.mean()
-
-    for i in range(300):
-        action1 = model.select_action(np.array(state1))
-        print('action1', action1)
-        model.rewards.append(-1)
-        action2 = model.select_action(np.array(state2))
-        print('action2', action2)
-        model.rewards.append(-30)
-        optimizer = optim.RMSprop(model.parameters(), lr=1e-4)
-
-        model.update_policy(optimizer)
+# if __name__ == '__main__':
+#     state1 = np.array([-1,-1,-1,-1, -1])
+#     state2 = np.array([57,-1,-1,-1, -1])
+#     state3 = np.array([-1,-1,-1,-1, -1])
+#     # state = torch.from_numpy(state).float().unsqueeze(0)
+#
+#     FILE_PREFIX = '/path/mv/model/'
+#     file_name = 'policy_pretrain_0.7437.pkl'
+#     model = torch.load(FILE_PREFIX + file_name)
+#
+#     a = torch.tensor(state1).float()
+#     b = a.std()
+#     mean = a.mean()
+#
+#     for i in range(300):
+#         action1 = model.select_action(np.array(state1))
+#         print('action1', action1)
+#         model.rewards.append(-1)
+#         action2 = model.select_action(np.array(state2))
+#         print('action2', action2)
+#         model.rewards.append(-30)
+#         optimizer = optim.RMSprop(model.parameters(), lr=1e-4)
+#
+#         model.update_policy(optimizer)
 
 
 

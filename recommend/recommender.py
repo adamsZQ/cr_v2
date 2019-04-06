@@ -1,10 +1,8 @@
 import json
-import os
 
-from numpy import argmax, np
+import numpy
 
 from recommend.knn_recommend.knn import KNN
-import h5py as h5py
 
 from tools.sql_tool import select_by_attributes
 
@@ -71,7 +69,7 @@ class Recommender:
         genres = []
         for state, id2tag, state_entity in zip(state_list, id2tag_list, state_sequence):
             if state_entity != 'genres':
-                attributes[state_entity] = id2tag[argmax(state)]
+                attributes[state_entity] = id2tag[numpy.argmax(state)]
             elif state_entity == 'genres':
                 genres_exsit = True
                 i = 0
@@ -98,7 +96,7 @@ class Recommender:
 
         item_sort, predict = self.model.predict(user_id, id_list_match_genre)
 
-        index_upsort = np.argsort(predict)
+        index_upsort = numpy.np.argsort(predict)
         index_downsort = index_upsort[::-1]
 
         top_k_items = [id_list_match_genre[index] for index in index_downsort[:top_k]]
