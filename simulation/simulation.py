@@ -15,6 +15,7 @@ from belief_tracker.data.training_data import get_training_data
 from belief_tracker.train.bilstm_training import prepare_sequence
 from recommend.knn_recommend.knn import KNN
 from tools.data_transfer import DataTool
+from tools.simple_tools import chunks
 from tools.sql_tool import select_by_attributes, select_genres, select_all_movie_genres, select_all
 
 FILE_PREFIX = None
@@ -34,7 +35,7 @@ bf_prefix = 'bf/'
 FILE_PREFIX = os.path.expanduser(FILE_PREFIX)
 
 data_path = bf_prefix + model_type + '/training_data'
-sentences_data, tag_data = (get_training_data(FILE_PREFIX, data_path))
+sentences_data, tag_data, user_list, movie_list= (get_training_data(FILE_PREFIX, data_path))
 
 # get word embeddings
 glove_embeddings = Glove_Embeddings(FILE_PREFIX, data_path)
@@ -49,6 +50,9 @@ id2tag = glove_embeddings.task_id2tag
 sentences_prepared = prepare_sequence(sentences_data, word2id, boundary_tags)
 tag_prepared = prepare_sequence(tag_data, tag2id, boundary_tags)
 
+# zip sentence, user and movie
+data_zipped = zip(sentences_prepared, user_list, movie_list)
+
 # load bf model
 model_path = ''
 model = load_model(model_path)
@@ -56,13 +60,13 @@ word_embeds = model.embedding
 
 # get part of datalist
 # X_train, X_test, y_train, y_test = train_test_split(sentences_data, tag_data, test_size=0.96, random_state=1)
-X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.2, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_prepared, test_size=0.2, random_state=1)
 print(len(X_train))
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
 
-
 actions = ['director', 'genres', 'critic_rating', 'country', 'audience_rating', 'recommendation']
-
+# question sequence in training data
+question_sequence = ['country', 'director', 'audience_rating', 'critic_rating', 'genres']
 movie_genres = select_all_movie_genres()
 
 # print(movie_genres)
@@ -91,11 +95,32 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-# TODO convert enetity to id and 'di_id'
-def entity2id(name, entity_tag):
-    entity_id = None
-    entity_str = None
-    return entity_id, entity_str
+# # TODO convert enetity to id and 'di_id'
+# def entity2id(name, entity_tag):
+#     entity_id = None
+#     entity_str = None
+#     return entity_id, entity_str
+
+def get_bf_result(action, entity2question):
+    question = entity2question[actions[action]][0]
+    sentence = torch.tensor(question).long().to(device)
+    predict = model(word_embeds, sentence)
+    tags_pred_list = predict[1]
+
+    entity_id_str = []
+    # entity_id_int = []
+    entity_tag = ''
+    for word, tag in zip(sentence, tags_pred_list):
+        tag_name = id2tag[tag]
+        word_name = id2word[word]
+        if tag_name != 'O':
+            entity_id_str.append(word_name)
+            # entity_id_int.append(word_name.split('_')[1])
+            entity_tag = tag_name.split('-')
+
+    id_str = ' '.join(entity_id_str)
+
+    return id_str, entity_tag
 
 
 def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
@@ -111,21 +136,23 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
         t_rec = 0
         quit_num = 0
 
-        for sentence in X_train:
-            sentence = torch.tensor(sentence).long().to(device)
-            predict = model(word_embeds, sentence)
-            tags_pred_list = predict[1]
+        for data in chunks(X_train, 5):
+            entity2question = {question_sequence[i]: data[i] for i in range(5)}
 
-            entity_word = []
-            entity_tag = []
-            for word, tag in zip(sentence, tags_pred_list):
-                tag_name = id2tag[tag]
-                word_name = id2word[word]
-                if tag_name != 'O':
-                    entity_word.append(word_name)
-                    entity_tag.append(tag)
+            # sentence = torch.tensor(sentence).long().to(device)
+            # predict = model(word_embeds, sentence)
+            # tags_pred_list = predict[1]
 
-            entity_id, entity_str = entity2id(word_name, entity_tag)
+            # entity_word = []
+            # entity_tag = []
+            # for word, tag in zip(sentence, tags_pred_list):
+            #     tag_name = id2tag[tag]
+            #     word_name = id2word[word]
+            #     if tag_name != 'O':
+            #         entity_word.append(word_name)
+            #         entity_tag.append(tag)
+            #
+            # entity_id, entity_str = entity2id(word_name, entity_tag)
 
             # director_id = data['director']
             # genres_id = data['genres'].split('|')
@@ -171,9 +198,13 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
                     else:
                         # print('ask question')
                         if state_id[action] == -1:
+                            # get result from belief_tracker, result is a triplet (question, user, movie)
+                            id_str, entity_tag = get_bf_result(action, entity2question)
+
+                            # TODO find aciton index
                             state_id[action] = data_id[action]
                             # TODO check
-                            state_str = state_str + ' ' + data_str[action]
+                            state_str = state_str + id_str
                         reward = r_c
                 # if action is recommendation
                 elif action == 5:

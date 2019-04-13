@@ -4,6 +4,8 @@ import random
 
 from sklearn.model_selection import train_test_split
 
+from tools.simple_tools import chunks
+
 prefix = '/home/next/cr_repo/bf/conv_data/split/'
 
 name_list = ['ddl', 'ddl2', 'ddl3', 'k', 'zh', 'k2']
@@ -38,11 +40,6 @@ for name in name_list:
                 data_list.append(line.replace('<genres>', '<genre>'))
             i = i % 11
             i = i + 1
-
-
-def chunks(arr, n):
-    return [arr[i:i+n] for i in range(0, len(arr), n)]
-
 
 j = 1
 data_1genre = []
