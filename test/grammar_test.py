@@ -14,9 +14,15 @@
 # b.append(a)
 # print(b)
 
-a = [1,2,[3,4]]
+# a = [1,2,[3,4]]
+#
+# print(len(a))
+# for i in a:
+#     if i !=1 :
+#         print(i)
 
-print(len(a))
-for i in a:
-    if i !=1 :
-        print(i)
+# a = [1,2,3]
+# b = ['a']
+# b = a[:3]
+#
+# print(b)

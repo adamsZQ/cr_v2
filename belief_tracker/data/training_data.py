@@ -6,6 +6,8 @@ def get_training_data(file_prefix, data_path):
     tags = []
     with open(file_prefix + data_path) as d:
         for line in d:
+            # if len(line) < 3:
+            #     continue
             data_json = json.loads(line)
             sentence = data_json['key'].split()
             data.append(sentence)

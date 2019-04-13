@@ -209,7 +209,6 @@ class BiLSTM_CRF(nn.Module):
         return score, tag_seq
 
 
-
 START_TAG = "<START>"
 STOP_TAG = "<STOP>"
 PADDING_TAG = "<PAD>"
@@ -235,9 +234,9 @@ def bilstm_train(word2id,
     optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
     # word_embeds = model.embedding
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.999, random_state=2,
-                                                        shuffle=True)
-    X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0, random_state=2)
+    X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    print(len(X_train))
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)
 
     epoch = 1000
@@ -247,7 +246,6 @@ def bilstm_train(word2id,
     for num_epochs in range(epoch):
         for sentence, tags in zip(X_train, y_train):
 
-            model.zero_grad()
             # Step 3. Run our forward pass.
             sentence = torch.tensor(sentence).long()
             # torch.unsqueeze(sentence, 0)

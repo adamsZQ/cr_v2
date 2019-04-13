@@ -9,56 +9,33 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch import optim
 
-from belief_tracker.BiLSTM_CRF_nobatch import load_model
-from belief_tracker.data.glove import Glove_Embeddings
-from belief_tracker.data.training_data import get_training_data
-from belief_tracker.train.bilstm_training import prepare_sequence
 from recommend.knn_recommend.knn import KNN
 from tools.data_transfer import DataTool
 from tools.sql_tool import select_by_attributes, select_genres, select_all_movie_genres, select_all
 
-FILE_PREFIX = None
-model_type = None
-boundary_tags = None
-
-if FILE_PREFIX is None:
-    FILE_PREFIX = '~/cr_repo/'
-if model_type is None:
-    model_type = 'test1'
-if boundary_tags is None:
-    boundary_tags = False
-
-HIDDEN_DIM = 20
-bf_prefix = 'bf/'
-
-FILE_PREFIX = os.path.expanduser(FILE_PREFIX)
-
-data_path = bf_prefix + model_type + '/training_data'
-sentences_data, tag_data = (get_training_data(FILE_PREFIX, data_path))
-
-# get word embeddings
-glove_embeddings = Glove_Embeddings(FILE_PREFIX, data_path)
-glove_embeddings.words_expansion()
-word_embeddings = glove_embeddings.task_embeddings
-word2id = glove_embeddings.task_word2id
-tag2id = glove_embeddings.task_tag2id
-id2word = glove_embeddings.task_id2word
-id2tag = glove_embeddings.task_id2tag
-
-# sentence data -> index
-sentences_prepared = prepare_sequence(sentences_data, word2id, boundary_tags)
-tag_prepared = prepare_sequence(tag_data, tag2id, boundary_tags)
-
-# load bf model
-model_path = ''
-model = load_model(model_path)
-word_embeds = model.embedding
+data_list = []
+director_list = []
+genres_list = []
+critic_rating_list = []
+country_list = []
+audience_rating_list = []
+with open(os.path.expanduser('~/path/mv/movie_rating'), 'r') as f:
+    for line in f:
+        line = json.loads(line)
+        data_list.append(line)
+        director_list.append(line['director'])
+        genres_list.append(set(line['genres'].split('|')))
+        critic_rating_list.append(line['critic_rating'])
+        country_list.append(line['country'])
+        audience_rating_list.append(line['audience_rating'])
 
 # get part of datalist
-# X_train, X_test, y_train, y_test = train_test_split(sentences_data, tag_data, test_size=0.96, random_state=1)
-X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.2, random_state=1)
-print(len(X_train))
-X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
+data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.96, random_state=1)
+# data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.9, random_state=1)
+# train test split
+trainset, testset, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.2, random_state=1)
+print(len(trainset))
+testset, valset, a, b = train_test_split(testset, [0] * len(testset), test_size=0.5, random_state=2)
 
 
 actions = ['director', 'genres', 'critic_rating', 'country', 'audience_rating', 'recommendation']
@@ -91,13 +68,6 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-# TODO convert enetity to id and 'di_id'
-def entity2id(name, entity_tag):
-    entity_id = None
-    entity_str = None
-    return entity_id, entity_str
-
-
 def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
     print('simulate start')
     num_epochs = 10000
@@ -111,38 +81,23 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
         t_rec = 0
         quit_num = 0
 
-        for sentence in X_train:
-            sentence = torch.tensor(sentence).long().to(device)
-            predict = model(word_embeds, sentence)
-            tags_pred_list = predict[1]
+        for data in trainset:
+            director_id = data['director']
+            genres_id = data['genres'].split('|')
+            critic_rating_id = data['critic_rating']
+            country_id = data['country']
+            audience_rating_id = data['audience_rating']
 
-            entity_word = []
-            entity_tag = []
-            for word, tag in zip(sentence, tags_pred_list):
-                tag_name = id2tag[tag]
-                word_name = id2word[word]
-                if tag_name != 'O':
-                    entity_word.append(word_name)
-                    entity_tag.append(tag)
+            director = 'di_' + str(data['director'])
+            genres = ' '.join(['ge_' + str(genre) for genre in data['genres'].split('|')])
+            critic_rating = 'cr_' + str(data['critic_rating'])
+            country = 'co_' + str(data['country'])
+            audience_rating = 'au_' + str(data['audience_rating'])
+            user = data['user']
+            target = data['movie']
 
-            entity_id, entity_str = entity2id(word_name, entity_tag)
-
-            # director_id = data['director']
-            # genres_id = data['genres'].split('|')
-            # critic_rating_id = data['critic_rating']
-            # country_id = data['country']
-            # audience_rating_id = data['audience_rating']
-            #
-            # director = 'di_' + str(data['director'])
-            # genres = ' '.join(['ge_' + str(genre) for genre in data['genres'].split('|')])
-            # critic_rating = 'cr_' + str(data['critic_rating'])
-            # country = 'co_' + str(data['country'])
-            # audience_rating = 'au_' + str(data['audience_rating'])
-            # user = data['user']
-            # target = data['movie']
-
-            # data_str = [director, genres, critic_rating, country, audience_rating]
-            data_id = ['director_id', 'genres_id', 'critic_rating_id', 'country_id', 'audience_rating_id']
+            data_str = [director, genres, critic_rating, country, audience_rating]
+            data_id = [director_id, genres_id, critic_rating_id, country_id, audience_rating_id]
             state_str = ''
             state_id = [-1] * len(data_id)
             reward = 0
@@ -219,8 +174,8 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
             train_ave_reward = np.mean(reward_list)
             # ave_reward = np.mean(reward_list)
             ave_conv = np.mean(conversation_turn_num)
-            accuracy = float(correct_num) / len(X_train)
-            quit_rating = float(quit_num) / len(X_train)
+            accuracy = float(correct_num) / len(trainset)
+            quit_rating = float(quit_num) / len(trainset)
 
             val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(model, recommender, max_dialength, max_recreward, r_rec_fail, None, r_c, r_q)
 
@@ -249,7 +204,7 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
     conversation_turn_num = []
     correct_num = 0
     quit_num = 0
-    for data in X_val:
+    for data in valset:
         director_id = data['director']
         genres_id = data['genres'].split('|')
         critic_rating_id = data['critic_rating']
@@ -326,8 +281,8 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
 
     ave_reward = np.mean(reward_list)
     ave_conv = np.mean(conversation_turn_num)
-    accuracy = float(correct_num) / len(X_val)
-    quit_rating = float(quit_num) / len(X_val)
+    accuracy = float(correct_num) / len(valset)
+    quit_rating = float(quit_num) / len(valset)
 
     return ave_reward, ave_conv, accuracy, quit_rating
 
