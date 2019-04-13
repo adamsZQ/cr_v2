@@ -61,8 +61,8 @@ class KNN:
 
 
 if __name__ == '__main__':
-    recommender = KNN('/path/mv/', 'model/knn_model.m', 'ratings_cleaned.dat')
+    recommender = KNN('/home/next/cr_repo/', 'recommend/knn_model.m', 'ratings_cleaned.dat')
 
-    item_list, predicts = recommender.predict('39320', ['54001'])
+    results = recommender.test(recommender.testset)
 
-    print(item_list, predicts)
+    print(accuracy.rmse(results))

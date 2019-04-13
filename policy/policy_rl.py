@@ -81,6 +81,7 @@ class Policy(nn.Module):
         # state = torch.from_numpy(state).float().unsqueeze(0)
         # state = state.unsqueeze(0)
         probs = self(state, train=False)
+        # print('probs', probs)
         action = torch.argmax(probs, dim=1).tolist()
         return action[0]
 

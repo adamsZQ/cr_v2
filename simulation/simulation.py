@@ -10,7 +10,6 @@ from sklearn.model_selection import train_test_split
 from torch import optim
 
 from recommend.knn_recommend.knn import KNN
-from recommend.recommender import Recommender
 from tools.data_transfer import DataTool
 from tools.sql_tool import select_by_attributes, select_genres, select_all_movie_genres, select_all
 
@@ -31,7 +30,7 @@ with open(os.path.expanduser('~/path/mv/movie_rating'), 'r') as f:
         audience_rating_list.append(line['audience_rating'])
 
 # get part of datalist
-data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.999, random_state=1)
+data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.96, random_state=1)
 # data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.9, random_state=1)
 # train test split
 trainset, testset, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.2, random_state=1)
@@ -69,7 +68,7 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-def simulate(model, recommender, max_dialength=7, max_recreward=50,r_rec_fail=-10, r_c=-1, r_q=-10):
+def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
     print('simulate start')
     num_epochs = 10000
 
@@ -128,6 +127,7 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50,r_rec_fail=-1
                         # print('ask question')
                         if state_id[action] == -1:
                             state_id[action] = data_id[action]
+                            # TODO check
                             state_str = state_str + ' ' + data_str[action]
                         reward = r_c
                 # if action is recommendation
@@ -196,7 +196,7 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50,r_rec_fail=-1
 
             if val_accuracy > 0.70:
                 print('save model')
-                torch.save(model, '/home/next/cr_repo/simulate/rl_model{}_{}_{}.m'.format(val_accuracy, val_ave_conv, val_quit_rating))
+                torch.save(model, '/home/next/cr_repo/simulate/rl_stand_model{}_{}_{}.m'.format(val_accuracy, val_ave_conv, val_quit_rating))
 
 
 def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
@@ -231,7 +231,8 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
             state_onehot = state_str
             state_onehot = data_tool.data2onehot(state_onehot)
             state_onehot = data_tool.sparse_2torch(state_onehot)
-            action = model.select_action(state_onehot, device)
+            # print('state', state_id)
+            action = model.select_best_action(state_onehot, device)
             # print('state', state)
             #
             # print('action', action)
@@ -364,16 +365,16 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = os.path.expanduser('~/cr_repo/')
     if file_name is None:
-        file_name = 'pre_train/policy_pretrain_0.0319.pkl'
+        file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
 
     # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
     model = torch.load(FILE_PREFIX+file_name).to(device)
     data_tool = DataTool()
     recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
-    simulate(model, recommender, r_q=-10, r_c=-1, r_rec_fail=-1, max_recreward=50)
+    simulate(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
 
-    # val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
-
+    # val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = val(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
+    #
     # print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
     #       'val_accuracy_score: {:.6f}'.format(val_accuracy) +
     #       'val_ave_conversation: {:.6f}'.format(val_ave_conv) +

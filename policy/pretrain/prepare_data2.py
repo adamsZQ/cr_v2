@@ -8,6 +8,7 @@ import torch
 from scipy.sparse import hstack, vstack
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
 
 data_list = []
 str_list = []
@@ -50,10 +51,10 @@ def rule_based_action(brunch_num):
 
     question_maxlen = len(question_sequence)
 
+    data_slice, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.96, random_state=1)
 
-    data_slice = random.sample(data_list, 20000)
     for data in data_slice:
-        print('data generation starts')
+        # print('data generation starts')
         director = data['director']
         genres = data['genres'].split('|')
         critic_rating = data['critic_rating']
@@ -93,12 +94,12 @@ def rule_based_action(brunch_num):
 
     # state_list = np.array(state_list).reshape(-1,question_maxlen)
     state_list_trans = v.transform(state_list)
-    print(state_list_trans[:50])
+    # print(state_list_trans[:50])
     # state_sparse = vstack(state_list)
     state_torch = sparse_2torch(state_list_trans)
     action_list = np.array(action_list).reshape(-1, 1)
 
-    f = h5py.File('/home/next/cr_repo/pre_train/pretrain_data.h5', 'w')
+    f = h5py.File('/home/next/cr_repo/pre_train/pretrain_data_5turns.h5', 'w')
     f.create_dataset(data=state_torch, name='states')
     f.create_dataset(data=action_list, name='actions')
 

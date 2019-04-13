@@ -344,7 +344,7 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = os.path.expanduser('~/cr_repo/')
     if file_name is None:
-        file_name = 'pre_train/policy_pretrain_0.0319.pkl'
+        file_name = 'pre_train/policy_pretrain_5turns_0.2202.pkl'
 
         # file_name = '5turns/policy_pretrain_1.5979.pkl'
     model = torch.load(FILE_PREFIX + file_name).to(device)
@@ -352,4 +352,12 @@ if __name__ == '__main__':
     # recommender = Recommender(FILE_PREFIX, 'model/knn_model.m', 'ratings_cleaned.dat')
     recommender = None
     data_tool = DataTool()
-    simulate(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
+    simulate(model, recommender, r_q=-1, r_c=0, r_rec_fail=-3, max_recreward=3)
+
+    # val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
+    #
+    # print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
+    #       'val_accuracy_score: {:.6f}'.format(val_accuracy) +
+    #       'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
+    #       'val_quit_rating: {:.6f}'.format(val_quit_rating)
+    #       )
