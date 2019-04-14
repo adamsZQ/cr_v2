@@ -11,11 +11,11 @@ from torch import optim
 
 from belief_tracker.BiLSTM_CRF_nobatch import load_model
 from belief_tracker.data.glove import Glove_Embeddings
-from belief_tracker.data.training_data import get_training_data
+from belief_tracker.data.training_data import get_simulate_data
 from belief_tracker.train.bilstm_training import prepare_sequence
 from recommend.knn_recommend.knn import KNN
 from tools.data_transfer import DataTool
-from tools.simple_tools import chunks
+from tools.simple_tools import chunks, zip_data
 from tools.sql_tool import select_by_attributes, select_genres, select_all_movie_genres, select_all
 
 FILE_PREFIX = None
@@ -25,9 +25,10 @@ boundary_tags = None
 if FILE_PREFIX is None:
     FILE_PREFIX = '~/cr_repo/'
 if model_type is None:
-    model_type = 'test1'
+    model_type = 'test2'
 if boundary_tags is None:
     boundary_tags = False
+
 
 HIDDEN_DIM = 20
 bf_prefix = 'bf/'
@@ -35,7 +36,7 @@ bf_prefix = 'bf/'
 FILE_PREFIX = os.path.expanduser(FILE_PREFIX)
 
 data_path = bf_prefix + model_type + '/training_data'
-sentences_data, tag_data, user_list, movie_list= (get_training_data(FILE_PREFIX, data_path))
+sentences_data, tag_data, user_list, movie_list = (get_simulate_data(FILE_PREFIX, data_path))
 
 # get word embeddings
 glove_embeddings = Glove_Embeddings(FILE_PREFIX, data_path)
@@ -51,16 +52,18 @@ sentences_prepared = prepare_sequence(sentences_data, word2id, boundary_tags)
 tag_prepared = prepare_sequence(tag_data, tag2id, boundary_tags)
 
 # zip sentence, user and movie
-data_zipped = zip(sentences_prepared, user_list, movie_list)
+data_zipped = zip_data(sentences_prepared, user_list, movie_list)
+tag_chunk = chunks(tag_prepared, 5)
 
 # load bf model
-model_path = ''
+model_path = '/home/next/cr_repo/bf/test2/bilstm_crf_0.0221.pkl'
 model = load_model(model_path)
+# TODO load word embedding
 word_embeds = model.embedding
 
 # get part of datalist
-# X_train, X_test, y_train, y_test = train_test_split(sentences_data, tag_data, test_size=0.96, random_state=1)
-X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_prepared, test_size=0.2, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.999, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
 print(len(X_train))
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
 
@@ -94,12 +97,6 @@ for data in data_list:
 def get_genres(movie_id):
     return id_genres_list[movie_id]
 
-
-# # TODO convert enetity to id and 'di_id'
-# def entity2id(name, entity_tag):
-#     entity_id = None
-#     entity_str = None
-#     return entity_id, entity_str
 
 def get_bf_result(action, entity2question):
     question = entity2question[actions[action]][0]
@@ -136,39 +133,12 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
         t_rec = 0
         quit_num = 0
 
-        for data in chunks(X_train, 5):
-            entity2question = {question_sequence[i]: data[i] for i in range(5)}
+        for data in X_train:
+            five_sentences = data['five_sentences']
+            user = data['user']
+            movie = data['movie']
+            entity2question = {question_sequence[i]: five_sentences[i] for i in range(5)}
 
-            # sentence = torch.tensor(sentence).long().to(device)
-            # predict = model(word_embeds, sentence)
-            # tags_pred_list = predict[1]
-
-            # entity_word = []
-            # entity_tag = []
-            # for word, tag in zip(sentence, tags_pred_list):
-            #     tag_name = id2tag[tag]
-            #     word_name = id2word[word]
-            #     if tag_name != 'O':
-            #         entity_word.append(word_name)
-            #         entity_tag.append(tag)
-            #
-            # entity_id, entity_str = entity2id(word_name, entity_tag)
-
-            # director_id = data['director']
-            # genres_id = data['genres'].split('|')
-            # critic_rating_id = data['critic_rating']
-            # country_id = data['country']
-            # audience_rating_id = data['audience_rating']
-            #
-            # director = 'di_' + str(data['director'])
-            # genres = ' '.join(['ge_' + str(genre) for genre in data['genres'].split('|')])
-            # critic_rating = 'cr_' + str(data['critic_rating'])
-            # country = 'co_' + str(data['country'])
-            # audience_rating = 'au_' + str(data['audience_rating'])
-            # user = data['user']
-            # target = data['movie']
-
-            # data_str = [director, genres, critic_rating, country, audience_rating]
             data_id = ['director_id', 'genres_id', 'critic_rating_id', 'country_id', 'audience_rating_id']
             state_str = ''
             state_id = [-1] * len(data_id)
@@ -200,17 +170,14 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
                         if state_id[action] == -1:
                             # get result from belief_tracker, result is a triplet (question, user, movie)
                             id_str, entity_tag = get_bf_result(action, entity2question)
-
-                            # TODO find aciton index
-                            state_id[action] = data_id[action]
-                            # TODO check
+                            state_id[actions.index(entity_tag)] = entity_tag
                             state_str = state_str + id_str
                         reward = r_c
                 # if action is recommendation
                 elif action == 5:
                     # reward = max_recreward
                     t_rec_start = time.time()
-                    if recommendation(user, state_id, target, recommender):
+                    if recommendation(user, state_id, movie, recommender):
                         # recommend successfully
                         # print('recommend success')
                         reward = max_recreward

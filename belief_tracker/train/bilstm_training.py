@@ -3,13 +3,14 @@ import os
 
 from belief_tracker.BiLSTM_CRF_nobatch import BiLSTM_CRF, bilstm_train
 from belief_tracker.data.glove import Glove_Embeddings
-from belief_tracker.data.training_data import get_training_data
 
 import argparse
 import numpy as np
 
 import torch
 from torch import nn
+
+from belief_tracker.data.training_data import get_simulate_data
 
 START_TAG = "<START>"
 STOP_TAG = "<STOP>"
@@ -71,7 +72,7 @@ if __name__ == '__main__':
 
     # get training data
     data_path = bf_prefix + model_type + '/training_data'
-    sentences_data, tag_data = (get_training_data(FILE_PREFIX, data_path))
+    sentences_data, tag_data, user_list, movie_list= (get_simulate_data(FILE_PREFIX, data_path))
 
     # get word embeddings
     glove_embeddings = Glove_Embeddings(FILE_PREFIX, data_path)

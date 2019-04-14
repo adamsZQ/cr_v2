@@ -269,8 +269,10 @@ def bilstm_train(word2id,
                   'f1_score: {:.6f}'.format(f1))
             sys.stdout.flush()
 
-            model.embedding = word_embeds
+            # model.embedding = word_embeds
+
             best_loss = torch_save_model(model, model_prefix, file_name, 1 - f1, best_loss)
+            best_loss = torch_save_model(word_embeds, model_prefix, file_name, 1 - f1, best_loss)
 
     torch_save_model(model_prefix, file_name, enforcement=True)
 
