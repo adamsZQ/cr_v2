@@ -151,7 +151,7 @@ class BiLSTM_CRF(nn.Module):
         backpointers = []
 
         # Initialize the viterbi variables in log space
-        init_vvars = torch.full((1, self.tagset_size), -10000.).to(device_enable)
+        init_vvars = torch.full((1, self.tagset_size), -10000.)
         init_vvars[0][self.tag_to_ix[START_TAG]] = 0
 
         # forward_var at step i holds the viterbi variables for step i-1
@@ -234,7 +234,7 @@ def bilstm_train(word2id,
     optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
     # word_embeds = model.embedding
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0, random_state=2)
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.99, random_state=2)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
     print(len(X_train))
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)
@@ -272,7 +272,7 @@ def bilstm_train(word2id,
             # model.embedding = word_embeds
 
             best_loss = torch_save_model(model, model_prefix, file_name, 1 - f1, best_loss)
-            best_loss = torch_save_model(word_embeds, model_prefix, file_name, 1 - f1, best_loss)
+            torch_save_model(word_embeds.weight, model_prefix, 'embedding', enforcement=True)
 
     torch_save_model(model_prefix, file_name, enforcement=True)
 

@@ -1,12 +1,12 @@
 
 
-a_list = [1,2,3]
-b_list = ['a', 'b', 'c']
-c_list = ['!', '@', '#']
-
-zipped = zip(a_list, b_list, c_list)
-
-print(zipped)
+# a_list = [1,2,3]
+# b_list = ['a', 'b', 'c']
+# c_list = ['!', '@', '#']
+#
+# zipped = zip(a_list, b_list, c_list)
+#
+# print(zipped)
 
 # a = 'sadf'
 # b = []
@@ -27,3 +27,7 @@ print(zipped)
 # b = a[:3]
 #
 # print(b)
+
+a = 'sdf_d'
+v = a.split('_')[1]
+print(v)

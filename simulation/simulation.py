@@ -7,7 +7,7 @@ import numpy as np
 
 import torch
 from sklearn.model_selection import train_test_split
-from torch import optim
+from torch import optim, nn
 
 from belief_tracker.BiLSTM_CRF_nobatch import load_model
 from belief_tracker.data.glove import Glove_Embeddings
@@ -57,12 +57,14 @@ tag_chunk = chunks(tag_prepared, 5)
 
 # load bf model
 model_path = '/home/next/cr_repo/bf/test2/bilstm_crf_0.0221.pkl'
-model = load_model(model_path)
+bf_model = load_model(model_path)
 # TODO load word embedding
-word_embeds = model.embedding
+embedding_path = '/home/next/cr_repo/bf/test2/embedding_enforcement.pkl'
+word_embeds_weight = torch.load(embedding_path)
+word_embeds = nn.Embedding.from_pretrained(word_embeds_weight, freeze=True)
 
 # get part of datalist
-X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.999, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0, random_state=1)
 X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
 print(len(X_train))
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
@@ -98,33 +100,52 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-def get_bf_result(action, entity2question):
-    question = entity2question[actions[action]][0]
+def get_bf_result(action, entity2question, word_embeds):
+    question = entity2question[actions[action]]
     sentence = torch.tensor(question).long().to(device)
-    predict = model(word_embeds, sentence)
+    # print(sentence)
+    predict = bf_model(word_embeds, sentence)
     tags_pred_list = predict[1]
 
     entity_id_str = []
-    # entity_id_int = []
+    entity_id = []
     entity_tag = ''
     for word, tag in zip(sentence, tags_pred_list):
         tag_name = id2tag[tag]
-        word_name = id2word[word]
+        word_name = id2word[word.tolist()]
         if tag_name != 'O':
+            # if recognition fail, continue
+            if '_' not in word_name:
+                print('bf recognition fail', word_name, tag_name)
+                continue
+
             entity_id_str.append(word_name)
             # entity_id_int.append(word_name.split('_')[1])
-            entity_tag = tag_name.split('-')
+            entity_tag = tag_name.split('-')[1]
+
+            entity_id.append(int(word_name.split('_')[1]))
 
     id_str = ' '.join(entity_id_str)
+    if entity_tag == 'genre':
+        entity_tag = 'genres'
 
-    return id_str, entity_tag
+    if len(entity_id) == 0:
+        # recognition None
+        return None, None, None
+    elif len(entity_id) == 1 and entity_tag != 'genres':
+        entity_id = entity_id[0]
+    elif len(entity_id) > 1 and entity_tag != 'genres':
+        # recognition fails
+        return None, None, None
+
+    return id_str, entity_id, entity_tag
 
 
-def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
+def simulate(policy, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
     print('simulate start')
     num_epochs = 10000
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = optim.Adam(policy.parameters(), lr=1e-2)
     for epoch in range(num_epochs):
         reward_list = []
         conversation_turn_num = []
@@ -152,7 +173,7 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
                 # print('state_onehot', state_onehot)
                 # print('state_id', state_id)
                 state_onehot = data_tool.sparse_2torch(state_onehot)
-                action = model.select_action(state_onehot, device)
+                action = policy.select_action(state_onehot, device)
                 # print('state', state)
                 #
                 # print('action', action)
@@ -169,9 +190,12 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
                         # print('ask question')
                         if state_id[action] == -1:
                             # get result from belief_tracker, result is a triplet (question, user, movie)
-                            id_str, entity_tag = get_bf_result(action, entity2question)
-                            state_id[actions.index(entity_tag)] = entity_tag
-                            state_str = state_str + id_str
+                            id_str, entity_id, entity_tag = get_bf_result(action, entity2question, word_embeds)
+                            if entity_id is None:
+                                continue
+                            else:
+                                state_id[actions.index(entity_tag)] = entity_id
+                                state_str = state_str + id_str
                         reward = r_c
                 # if action is recommendation
                 elif action == 5:
@@ -191,24 +215,24 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
                     break
                 else:
                     # print('wrong action')
-                    model.rewards.append(r_q)
+                    policy.rewards.append(r_q)
                     break
 
                 # append reward
                 #print('reward',reward)
-                model.rewards.append(reward)
+                policy.rewards.append(reward)
                 reward_list.append(reward)
 
             # append reward
             #print('reward', reward)
 
-            model.rewards.append(reward)
+            policy.rewards.append(reward)
             reward_list.append(reward)
             # append conversation turn num
             conversation_turn_num.append(i+1)
             # update policy
             #print('update')
-            model.update_policy(optimizer)
+            policy.update_policy(optimizer)
 
         if epoch % 1 == 0:
             print('sequence time:', time.time()-t_start)
@@ -220,7 +244,7 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
             accuracy = float(correct_num) / len(X_train)
             quit_rating = float(quit_num) / len(X_train)
 
-            val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(model, recommender, max_dialength, max_recreward, r_rec_fail, None, r_c, r_q)
+            val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(policy, recommender, max_dialength, max_recreward, r_rec_fail, None, r_c, r_q)
 
             # ave_reward, ave_conv, accuracy = val(model, recommender, max_dialength, max_recreward, r_c, r_q)
             print('Epoch[{}/{}]'.format(epoch, num_epochs) +
@@ -239,31 +263,21 @@ def simulate(model, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-
 
             if val_accuracy > 0.70:
                 print('save model')
-                torch.save(model, '/home/next/cr_repo/simulate/rl_stand_model{}_{}_{}.m'.format(val_accuracy, val_ave_conv, val_quit_rating))
+                torch.save(policy, '/home/next/cr_repo/simulate/rl_stand_model{}_{}_{}.m'.format(val_accuracy, val_ave_conv, val_quit_rating))
 
 
-def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
+def val(policy, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
     reward_list = []
     conversation_turn_num = []
     correct_num = 0
     quit_num = 0
     for data in X_val:
-        director_id = data['director']
-        genres_id = data['genres'].split('|')
-        critic_rating_id = data['critic_rating']
-        country_id = data['country']
-        audience_rating_id = data['audience_rating']
-
-        director = 'di_' + str(data['director'])
-        genres = ' '.join(['ge_' + str(genre) for genre in data['genres'].split('|')])
-        critic_rating = 'cr_' + str(data['critic_rating'])
-        country = 'co_' + str(data['country'])
-        audience_rating = 'au_' + str(data['audience_rating'])
+        five_sentences = data['five_sentences']
         user = data['user']
-        target = data['movie']
+        movie = data['movie']
+        entity2question = {question_sequence[i]: five_sentences[i] for i in range(5)}
 
-        data_str = [director, genres, critic_rating, country, audience_rating]
-        data_id = [director_id, genres_id, critic_rating_id, country_id, audience_rating_id]
+        data_id = ['director_id', 'genres_id', 'critic_rating_id', 'country_id', 'audience_rating_id']
         state_str = ''
         state_id = [-1] * len(data_id)
         reward = 0
@@ -275,7 +289,7 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
             state_onehot = data_tool.data2onehot(state_onehot)
             state_onehot = data_tool.sparse_2torch(state_onehot)
             # print('state', state_id)
-            action = model.select_best_action(state_onehot, device)
+            action = policy.select_best_action(state_onehot, device)
             # print('state', state)
             #
             # print('action', action)
@@ -290,13 +304,19 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
                     break
                 else:
                     # print('ask question')
-                    state_id[action] = data_id[action]
-                    state_str = state_str + ' ' + data_str[action]
+                    if state_id[action] == -1:
+                        # get result from belief_tracker, result is a triplet (question, user, movie)
+                        id_str, entity_id, entity_tag = get_bf_result(action, entity2question, word_embeds)
+                        if entity_id is None:
+                            continue
+                        else:
+                            state_id[actions.index(entity_tag)] = entity_id
+                            state_str = state_str + id_str
                     reward = r_c
             # if action is recommendation
             elif action == 5:
                 # reward = max_recreward
-                if recommendation(user, state_id, target, recommender):
+                if recommendation(user, state_id, movie, recommender):
                     # recommend successfully
                     # print('recommend success')
                     reward = max_recreward
@@ -308,15 +328,15 @@ def val(model, recommender, max_dialength, max_recreward, r_rec_fail, device, r_
                 break
             else:
                 # print('wrong action')
-                model.rewards.append(r_q)
+                policy.rewards.append(r_q)
                 break
 
             # append reward
             # print('reward',reward)
-            model.rewards.append(reward)
+            policy.rewards.append(reward)
             reward_list.append(reward)
         #print('reward', reward)
-        model.rewards.append(reward)
+        policy.rewards.append(reward)
         reward_list.append(reward)
 
         # append conversation turn num
@@ -355,8 +375,9 @@ def recommendation(user_id, states, target, recommender, top_k=1):
         except Exception as e:
             print('states', states, 'attributes', attributes)
     # get id from database those match all attributes without genres
-    id_list_nogenre = select_by_attributes(attributes)
+    # print('states', states, 'attributes', attributes)
 
+    id_list_nogenre = select_by_attributes(attributes)
     if no_genres:
         #print('nogenres', attributes)
         # if genres doesn't in attribute, skip checking genre
@@ -411,16 +432,16 @@ if __name__ == '__main__':
         file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
 
     # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
-    model = torch.load(FILE_PREFIX+file_name).to(device)
+    policy = torch.load(FILE_PREFIX+file_name).to(device)
     data_tool = DataTool()
     recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
-    simulate(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
+    # simulate(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
 
-    # val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = val(model, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
-    #
-    # print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
-    #       'val_accuracy_score: {:.6f}'.format(val_accuracy) +
-    #       'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
-    #       'val_quit_rating: {:.6f}'.format(val_quit_rating)
-    #       )
+    val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = val(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
+
+    print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
+          'val_accuracy_score: {:.6f}'.format(val_accuracy) +
+          'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
+          'val_quit_rating: {:.6f}'.format(val_quit_rating)
+          )
 
