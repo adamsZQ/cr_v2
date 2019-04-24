@@ -40,18 +40,23 @@ def val(model, word_embeds, device, X_val, y_val):
     for sentence, tags in zip(X_val,y_val):
         sentence = torch.tensor(sentence).long().to(device)
         predict = model(word_embeds, sentence)
-        predict_list.append(predict[1])
-        target_list.append(tags)
+        for pre in predict[1]:
+            predict_list.append(pre)
+        for tag in tags:
+            target_list.append(tag)
 
-    binarizer = MultiLabelBinarizer()
-    binarizer.fit_transform([[x for x in range(model.tagset_size)]])
-    target_list = binarizer.transform(target_list)
-    predict_list = binarizer.transform(predict_list)
+    predict_list = np.reshape(predict_list, (-1, 1)).tolist()
+    target_list = np.reshape(target_list, (-1, 1)).tolist()
+
+    # binarizer = MultiLabelBinarizer()
+    # binarizer.fit_transform([x for x in target_list])
+    # target_list_bi = binarizer.transform(target_list)
+    # predict_list_bi = binarizer.transform(predict_list)
 
     accuracy = accuracy_score(target_list, predict_list)
-    f1 = f1_score(target_list, predict_list, average="samples")
-    precision = precision_score(target_list, predict_list, average="samples")
-    recall = recall_score(target_list, predict_list, average="samples")
+    f1 = f1_score(target_list, predict_list, average="micro")
+    precision = precision_score(target_list, predict_list, average="micro")
+    recall = recall_score(target_list, predict_list, average="micro")
 
     return accuracy, precision, recall, f1
 
@@ -231,10 +236,10 @@ def bilstm_train(word2id,
     device_enable = device
     # model =load_m(model_prefix + 'bilstm_crf_0.0789.pkl')
     model = BiLSTM_CRF(len(word2id), tag2id, word_embeddings[0].size, HIDDEN_DIM).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
     # word_embeds = model.embedding
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.99, random_state=2)
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0, random_state=2)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
     print(len(X_train))
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)
@@ -271,8 +276,8 @@ def bilstm_train(word2id,
 
             # model.embedding = word_embeds
 
-            best_loss = torch_save_model(model, model_prefix, file_name, 1 - f1, best_loss)
-            torch_save_model(word_embeds.weight, model_prefix, 'embedding', enforcement=True)
+            best_loss = torch_save_model(model, model_prefix, file_name, 1 - accuracy, best_loss)
+            torch_save_model(word_embeds.weight, model_prefix, 'embedding{}'.format(1 - accuracy), enforcement=True)
 
     torch_save_model(model_prefix, file_name, enforcement=True)
 

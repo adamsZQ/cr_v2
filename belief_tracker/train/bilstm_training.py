@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument("--boundary_tags") # add START END tags
     args = parser.parse_args()
 
-    HIDDEN_DIM = 20
+    HIDDEN_DIM = 128
     FILE_PREFIX = args.prefix
     model_type = args.model
     bf_prefix = 'bf/'
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = '~/cr_repo/'
     if model_type is None:
-        model_type = 'test2'
+        model_type = 'test_full'
     if boundary_tags is None:
         boundary_tags = False
 

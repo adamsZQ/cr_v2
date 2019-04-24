@@ -64,7 +64,7 @@ word_embeds_weight = torch.load(embedding_path)
 word_embeds = nn.Embedding.from_pretrained(word_embeds_weight, freeze=True)
 
 # get part of datalist
-X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.96, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.9, random_state=2)
 X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
 print(len(X_train))
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
@@ -120,7 +120,7 @@ def get_bf_result(action, entity2question, word_embeds):
             if entity_asked == tag_entity:
                 # if recognition fail, continue
                 if '_' not in word_name:
-                    # print('bf recognition fail', word_name, tag_entity)
+                    # print('bf recognition fail', word_name, tag_entity, sentence)
                     continue
                 else:
                     entity_id_str.append(word_name)
@@ -130,146 +130,32 @@ def get_bf_result(action, entity2question, word_embeds):
                     entity_id.append(int(word_name.split('_')[1]))
     if len(entity_id) == 0:
         # recognition None
+        # print('fail zero')
         return None, None, None
     elif len(entity_id) == 1 and 'genres' not in entity_tag:
         entity_id = entity_id[0]
     elif len(entity_id) > 1 and 'genres' not in entity_tag:
+        # print('fail, exclude')
+
         return None, None, None
     id_str = ' '.join(entity_id_str)
+
     return id_str, entity_id, entity_asked
 
 
-def simulate(policy, recommender, max_dialength=7, max_recreward=50, r_rec_fail=-10, r_c=-1, r_q=-10):
-    print('simulate start')
-    num_epochs = 10000
-
-    optimizer = optim.Adam(policy.parameters(), lr=1e-2)
-    for epoch in range(num_epochs):
-        reward_list = []
-        conversation_turn_num = []
-        correct_num = 0
-        t_start = time.time()
-        t_rec = 0
-        quit_num = 0
-
-        for data in X_train:
-            five_sentences = data['five_sentences']
-            user = data['user']
-            movie = data['movie']
-            entity2question = {question_sequence[i]: five_sentences[i] for i in range(5)}
-
-            data_id = ['director_id', 'genres_id', 'critic_rating_id', 'country_id', 'audience_rating_id']
-            state_str = ''
-            state_id = [-1] * len(data_id)
-            reward = 0
-
-            for i in range(max_dialength):
-                # select action
-                # print('----------------------------------', i)
-                state_onehot = state_str
-                state_onehot = data_tool.data2onehot(state_onehot)
-                # print('state_onehot', state_onehot)
-                # print('state_id', state_id)
-                state_onehot = data_tool.sparse_2torch(state_onehot)
-                action = policy.select_best_action(state_onehot, device)
-                # print('state', state)
-                #
-                # print('action', action)
-
-                # if action asks question
-                if action in range(5):
-                    # if max_dialog length still asking question, give r_q
-                    if i == max_dialength - 1:
-                        # print('over length')
-                        reward = r_q
-                        quit_num = quit_num + 1
-                        break
-                    else:
-                        # print('ask question')
-                        if state_id[action] == -1:
-                            # get result from belief_tracker, result is a triplet (question, user, movie)
-                            id_str, entity_id, entity_tag = get_bf_result(action, entity2question, word_embeds)
-                            if entity_id is None:
-                                reward = r_c
-                            else:
-                                state_id[actions.index(entity_tag)] = entity_id
-                                state_str = state_str + id_str
-                        reward = r_c
-                # if action is recommendation
-                elif action == 5:
-                    # reward = max_recreward
-                    t_rec_start = time.time()
-                    if recommendation(user, state_id, movie, recommender):
-                        # recommend successfully
-                        # print('recommend success')
-                        reward = max_recreward
-                        correct_num = correct_num + 1
-                        t_rec_done = time.time()
-                        t_rec = t_rec + t_rec_done - t_rec_start
-                    else:
-                        # fail
-                        # print('recommend fail')
-                        reward = r_rec_fail
-                    break
-                else:
-                    # print('wrong action')
-                    policy.rewards.append(r_q)
-                    break
-
-                # append reward
-                #print('reward',reward)
-                policy.rewards.append(reward)
-                reward_list.append(reward)
-
-            # append reward
-            #print('reward', reward)
-
-            policy.rewards.append(reward)
-            reward_list.append(reward)
-            # append conversation turn num
-            conversation_turn_num.append(i+1)
-            # update policy
-            #print('update')
-            policy.update_policy(optimizer)
-
-        if epoch % 1 == 0:
-            print('sequence time:', time.time()-t_start)
-            print('rec time:', t_rec)
-
-            train_ave_reward = np.mean(reward_list)
-            # ave_reward = np.mean(reward_list)
-            ave_conv = np.mean(conversation_turn_num)
-            accuracy = float(correct_num) / len(X_train)
-            quit_rating = float(quit_num) / len(X_train)
-
-            val_ave_reward, val_ave_conv, val_accuracy, val_quit_rating = val(policy, recommender, max_dialength, max_recreward, r_rec_fail, None, r_c, r_q)
-
-            # ave_reward, ave_conv, accuracy = val(model, recommender, max_dialength, max_recreward, r_c, r_q)
-            print('Epoch[{}/{}]'.format(epoch, num_epochs) +
-                  'train ave_reward: {:.6f}'.format(train_ave_reward) +
-                  'accuracy_score: {:.6f}'.format(accuracy) +
-                  'ave_conversation: {:.6f}'.format(ave_conv) +
-                  'quit_rating: {:.6f}'.format(quit_rating)
-            )
-            print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
-                  'val_accuracy_score: {:.6f}'.format(val_accuracy) +
-                  'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
-                  'val_quit_rating: {:.6f}'.format(val_quit_rating)
-                  )
-
-            sys.stdout.flush()
-
-            if val_accuracy > 0.70:
-                print('save model')
-                torch.save(policy, '/home/next/cr_repo/simulate/rl_stand_model{}_{}_{}.m'.format(val_accuracy, val_ave_conv, val_quit_rating))
+def max_entropy_select_action(state, question_turn):
+    for i in range(question_turn):
+        if state[i] == -1:
+            return i
+    return 5
 
 
-def val(policy, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
+def max_entropy_simulate(entropy_turn, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
     reward_list = []
     conversation_turn_num = []
     correct_num = 0
     quit_num = 0
-    for data in X_val:
+    for data in X_test:
         five_sentences = data['five_sentences']
         user = data['user']
         movie = data['movie']
@@ -281,16 +167,8 @@ def val(policy, recommender, max_dialength, max_recreward, r_rec_fail, device, r
         reward = 0
 
         for i in range(max_dialength):
-            # select action
-            # print('----------------------------------', i)
-            state_onehot = state_str
-            state_onehot = data_tool.data2onehot(state_onehot)
-            state_onehot = data_tool.sparse_2torch(state_onehot)
-            # print('state', state_id)
-            action = policy.select_best_action(state_onehot, device)
-            # print('state', state)
-            #
-            # print('action', action)
+
+            action = max_entropy_select_action(state_id, entropy_turn)
 
             # if action asks question
             if action in range(5):
@@ -429,18 +307,19 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = os.path.expanduser('~/cr_repo/')
     if file_name is None:
-        file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
-        # file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.883720930232558_0.09302325581395349.m'
+        file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.883720930232558_0.09302325581395349.m'
+
     # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
     policy = torch.load(FILE_PREFIX+file_name).to(device)
     data_tool = DataTool()
     recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
-    simulate(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.8)
+    # simulate(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
 
-    # val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = val(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
-    #
-    # print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
-    #       'val_accuracy_score: {:.6f}'.format(val_accuracy) +
-    #       'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
-    #       'val_quit_rating: {:.6f}'.format(val_quit_rating)
-    #       )
+    val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = max_entropy_simulate(1, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=1.2, max_dialength=7, device=None)
+
+    print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
+          'val_accuracy_score: {:.6f}'.format(val_accuracy) +
+          'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
+          'val_quit_rating: {:.6f}'.format(val_quit_rating)
+          )
+

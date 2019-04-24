@@ -28,6 +28,14 @@
 #
 # print(b)
 
-a = 'sdf_d'
-v = a.split('_')[1]
-print(v)
+# a = 'sdf_d'
+# v = a.split('_')[1]
+# print(v)
+import numpy as np
+
+aa = [2, 3]
+
+ttt = []
+ttt.append([js for js in aa])
+dididi = np.reshape(aa, (1, 3, 1)).tolist()
+print(dididi)

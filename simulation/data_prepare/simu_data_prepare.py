@@ -37,7 +37,7 @@ for name in name_list:
                 data_list.append(line)
                 data_list.append(line.replace('audience', 'critic'))
             elif i % 10 == 0:
-                data_list.append(line.replace('<genres>', '<genre>'))
+                data_list.append(line.replace('<genre>', '<genres>'))
             i = i % 11
             i = i + 1
 
@@ -52,7 +52,7 @@ data_5sentences = chunks(data_list, 5)
 
 for data_list in data_5sentences:
     genre_sentence = data_list[4]
-    genre_num = genre_sentence.count('<genre>')
+    genre_num = genre_sentence.count('<genres>')
     if genre_num == 1:
         data_1genre.append(data_list)
     elif genre_num == 2:
@@ -164,14 +164,14 @@ for data in data_list:
     for genre in genres:
         value = 'ge_' + genre
         value_list.append(value)
-        genre_sentece = genre_sentece.replace('<genre>', value, 1)
+        genre_sentece = genre_sentece.replace('<genres>', value, 1)
         sentence_split = genre_sentece.split()
         try:
             tag_start_index = sentence_split.index(value)
         except Exception as e:
             print(sentence_split)
             print(value)
-        tags[tag_start_index] = 'B-' + 'genre'
+        tags[tag_start_index] = 'B-' + 'genres'
 
     data_json_list.append({'key': genre_sentece, 'value': value_list, 'tags': tags,  'user': user, 'movie': movie})
 
