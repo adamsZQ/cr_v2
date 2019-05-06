@@ -25,7 +25,7 @@ boundary_tags = None
 if FILE_PREFIX is None:
     FILE_PREFIX = '~/cr_repo/'
 if model_type is None:
-    model_type = 'test_entity_data'
+    model_type = 'test6'
 if boundary_tags is None:
     boundary_tags = False
 
@@ -56,16 +56,16 @@ data_zipped = zip_data(sentences_prepared, user_list, movie_list)
 tag_chunk = chunks(tag_prepared, 5)
 
 # load bf model
-model_path = '/home/next/cr_repo/bf/test_entity_data/bilstm_crf_0.0001.pkl'
+model_path = '/home/next/cr_repo/bf/test6/bilstm_crf_0.0052.pkl'
 bf_model = load_model(model_path)
 # TODO load word embedding
-embedding_path = '/home/next/cr_repo/bf/test_entity_data/embedding0.00011859582542694813_enforcement.pkl'
+embedding_path = '/home/next/cr_repo/bf/test6/embedding0.005154639175257714_enforcement.pkl'
 word_embeds_weight = torch.load(embedding_path)
 word_embeds = nn.Embedding.from_pretrained(word_embeds_weight, freeze=True)
 
 # get part of datalist
-X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.9, random_state=2)
-X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=8)
+X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.96, random_state=1)
+X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
 print(len(X_train))
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
 
@@ -100,105 +100,65 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-with open('/home/next/cr_repo/entity_id/director_id.json', 'r') as f:
-    director2id = json.load(f)
-id2director = {value: key for key, value in director2id.items()}
-with open('/home/next/cr_repo/entity_id/country_id.json', 'r') as f:
-    country2id = json.load(f)
-id2country = {value: key for key, value in country2id.items()}
-with open('/home/next/cr_repo/entity_id/genre_id.json', 'r') as f:
-    genre2id = json.load(f)
-id2genre = {value: key for key, value in genre2id.items()}
-
-
 def get_bf_result(action, entity2question, word_embeds):
     entity_asked = actions[action]
     question = entity2question[entity_asked]
-    sentence = torch.tensor(question).long().to(device)
+    question_word = [id2word[word] for word in question]
+    print(question_word)
+    # sentence = torch.tensor(question).long().to(device)
+    sentence = interact(entity_asked)
+    sentence_tensor = torch.tensor(sentence).squeeze(0).long().to(device)
+
     # print(sentence)
-    predict = bf_model(word_embeds, sentence)
+    predict = bf_model(word_embeds, sentence_tensor)
     tags_pred_list = predict[1]
 
-    entity_id_str_list = []
-    entity_id_list = []
-    entity_tag_list = []
-
-    previous_tag = ''
-    entity_queue = []
-    entities_list = []
-    for word, tag in zip(sentence, tags_pred_list):
+    # sentence_tensor = sentence_tensor.squeeze(0)
+    entity_id_str = []
+    entity_id = []
+    entity_tag = []
+    for word, tag in zip(sentence_tensor, tags_pred_list):
         tag_name = id2tag[tag]
         word_name = id2word[word.tolist()]
-
         if tag_name != 'O':
-            start_tag = tag_name.split('-')[0]
             tag_entity = tag_name.split('-')[1]
 
             if entity_asked == tag_entity:
-                if start_tag == 'B':
-                    if len(entity_queue) != 0:
-                        entities_list.append(entity_queue.copy())
-                        entity_queue = []
-                    entity_queue.append(word_name)
-                    previous_tag = 'B'
-                elif start_tag == 'I' and previous_tag != 'O':
-                    entity_queue.append(word_name)
-                    previous_tag = 'I'
-        else:
-            previous_tag = 'O'
-    entities_list.append(entity_queue.copy())
-    for entity in entities_list:
-        entity_name = ' '.join(entity)
-        if entity_asked == 'director':
-            entity_id = director2id[entity_name]
-            entity_str = 'di_' + str(entity_id)
-            entity_tag = entity_asked
-        elif entity_asked == 'genres':
-            entity_id = genre2id[entity_name]
-            entity_str = 'ge_' + str(entity_id)
-            entity_tag = entity_asked
+                # if recognition fail, continue
+                if '_' not in word_name:
+                    # print('bf recognition fail', word_name, tag_entity)
+                    continue
+                else:
+                    entity_id_str.append(word_name)
+                    # entity_id_int.append(word_name.split('_')[1])
+                    entity_tag.append(tag_entity)
 
-        elif entity_asked == 'country':
-            entity_id = country2id[entity_name]
-            entity_str = 'co_' + str(entity_id)
-            entity_tag = entity_asked
-        else:
-            entity_id = int(entity_name.split('_')[1])
-            entity_str = entity_name
-            entity_tag = entity_asked
-
-        entity_id_list.append(entity_id)
-        entity_id_str_list.append(entity_str)
-        entity_tag_list.append(entity_tag)
-
-    if len(entity_id_list) == 0:
+                    entity_id.append(int(word_name.split('_')[1]))
+    if len(entity_id) == 0:
         # recognition None
-        # print('fail zero')
         return None, None, None
-    elif len(entity_id_list) == 1 and 'genres' not in entity_tag_list:
-        entity_id_list = entity_id_list[0]
-    elif len(entity_id_list) > 1 and 'genres' not in entity_tag_list:
-        # print('fail, exclude')
-
+    elif len(entity_id) == 1 and 'genres' not in entity_tag:
+        entity_id = entity_id[0]
+    elif len(entity_id) > 1 and 'genres' not in entity_tag:
         return None, None, None
-    id_str = ' '.join(entity_id_str_list)
-
-    return id_str, entity_id_list, entity_asked
-
-
-def max_entropy_select_action(state, question_turn):
-    for i in range(question_turn):
-        if state[i] == -1:
-            return i
-    return 5
+    id_str = ' '.join(entity_id_str)
+    return id_str, entity_id, entity_asked
 
 
-def max_entropy_simulate(entropy_turn, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
+def interact(entity_asked):
+    print('Answer the question about ', entity_asked)
+    answer = input("Enter your answer: ")
+    answer_index = prepare_sequence([answer.split()], word2id, False)
+
+    return answer_index
+
+
+def evaluation(policy, recommender, max_dialength, max_recreward, r_rec_fail, device, r_c, r_q):
     reward_list = []
     conversation_turn_num = []
     correct_num = 0
     quit_num = 0
-    for data in X_test:
+    for data in X_val:
         five_sentences = data['five_sentences']
         user = data['user']
         movie = data['movie']
@@ -209,12 +169,17 @@ def max_entropy_simulate(entropy_turn, recommender, max_dialength, max_recreward
         state_id = [-1] * len(data_id)
         reward = 0
 
-        prob = 1
-        e_t = np.random.choice([entropy_turn, entropy_turn - 1], p=[prob, 1-prob])
-        # print(max_dialength)
         for i in range(max_dialength):
-
-            action = max_entropy_select_action(state_id, e_t)
+            # select action
+            # print('----------------------------------', i)
+            state_onehot = state_str
+            state_onehot = data_tool.data2onehot(state_onehot)
+            state_onehot = data_tool.sparse_2torch(state_onehot)
+            # print('state', state_id)
+            action = policy.select_best_action(state_onehot, device)
+            # print('state', state)
+            #
+            # print('action', action)
 
             # if action asks question
             if action in range(5):
@@ -239,16 +204,27 @@ def max_entropy_simulate(entropy_turn, recommender, max_dialength, max_recreward
                     reward = r_c
             # if action is recommendation
             elif action == 5:
-                # reward = max_recreward
-                if recommendation(user, state_id, movie, recommender):
-                    # recommend successfully
-                    # print('recommend success')
+                top_k = recommendation(user, state_id, movie, recommender)
+                print('answer is ', movie)
+                print('Do you like ', top_k)
+                answer = input("Enter your answer: ")
+
+                if str(answer) == '1':
                     reward = max_recreward
                     correct_num = correct_num + 1
                 else:
-                    # fail
-                    # print('recommend fail')
                     reward = r_rec_fail
+
+                # # reward = max_recreward
+                # if recommendation(user, state_id, movie, recommender):
+                #     # recommend successfully
+                #     # print('recommend success')
+                #     reward = max_recreward
+                #     correct_num = correct_num + 1
+                # else:
+                #     # fail
+                #     # print('recommend fail')
+                #     reward = r_rec_fail
                 break
             else:
                 # print('wrong action')
@@ -325,12 +301,13 @@ def recommendation(user_id, states, target, recommender, top_k=1):
 
     # print('result', list(zip(item_sort, predict)))
 
-    if int(target) in top_k_items:
-        #print('succeed!')
-        return True
-    else:
-        #print('fail!')
-        return False
+    return top_k_items
+    # if int(target) in top_k_items:
+    #     #print('succeed!')
+    #     return True
+    # else:
+    #     #print('fail!')
+    #     return False
 
 
 if __name__ == '__main__':
@@ -353,19 +330,12 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = os.path.expanduser('~/cr_repo/')
     if file_name is None:
-        file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.883720930232558_0.09302325581395349.m'
-
+        file_name = 'simulate/rl_stand_model0.7185185185185186_3.2666666666666666_0.08888888888888889.m'
+        # file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
+        # file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.6744186046511627_0.09302325581395349.m'
     # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
     policy = torch.load(FILE_PREFIX+file_name).to(device)
     data_tool = DataTool()
     recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
-    # simulate(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1)
-
-    val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = max_entropy_simulate(3, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=1.2, max_dialength=7, device=None)
-
-    print('val_ave_reward: {:.6f}'.format(val_ave_reward) +
-          'val_accuracy_score: {:.6f}'.format(val_accuracy) +
-          'val_ave_conversation: {:.6f}'.format(val_ave_conv) +
-          'val_quit_rating: {:.6f}'.format(val_quit_rating)
-          )
+    evaluation(policy, recommender,  r_q=-1, r_c=-20, r_rec_fail=-1, max_recreward=10, max_dialength=7, device=None)
 

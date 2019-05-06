@@ -75,6 +75,15 @@ with open(os.path.expanduser('~/path/mv/movie_rating'), 'r') as f:
         data_list.append(line)
 
 
+with open('/home/next/cr_repo/entity_id/director_id.json', 'r') as f:
+    director2id = json.load(f)
+id2director = {value: key for key, value in director2id.items()}
+with open('/home/next/cr_repo/entity_id/country_id.json', 'r') as f:
+    country2id = json.load(f)
+id2country = {value: key for key, value in country2id.items()}
+with open('/home/next/cr_repo/entity_id/genre_id.json', 'r') as f:
+    genre2id = json.load(f)
+id2genre = {value: key for key, value in genre2id.items()}
 # get part of data list
 data_list, useless, a, b = train_test_split(data_list, [0] * len(data_list), test_size=0.96, random_state=1)
 
@@ -100,31 +109,32 @@ for data in data_list:
 
     data_json_list = []
 
-    value = 'co_' + country
+    value = id2country[int(country)]
+    value_length = len(value.split())
     country_sentence = template[0]
+    tag_start_index = country_sentence.split().index('<country>')
     country_sentence = country_sentence.replace('<country>', value)
     sentence_split = country_sentence.split()
     tags = ['O'] * len(sentence_split)
-    try:
-        tag_start_index = sentence_split.index(value)
-    except Exception as e:
-        print(sentence_split)
-        print(value)
+
     tags[tag_start_index] = 'B-' + 'country'
+    if value_length != 1:
+        for i in range(value_length - 1):
+            tags[tag_start_index+i+1] = 'I-' + 'country'
     data_json_list.append({'key': country_sentence, 'value': value, 'tags': tags, 'user': user, 'movie': movie})
 
-    value = 'di_' + director
+    value = id2director[int(director)]
+    value_length = len(value.split())
     director_sentence = template[1]
+    tag_start_index = director_sentence.split().index('<director>')
     director_sentence = director_sentence.replace('<director>', value)
     sentence_split = director_sentence.split()
     tags = ['O'] * len(sentence_split)
-    try:
-        tag_start_index = sentence_split.index(value)
-    except Exception as e:
-        print(sentence_split)
-        print(value)
 
     tags[tag_start_index] = 'B-' + 'director'
+    if value_length != 1:
+        for i in range(value_length - 1):
+            tags[tag_start_index+i+1] = 'I-' + 'director'
 
     data_json_list.append({'key': director_sentence, 'value': value, 'tags': tags,  'user': user, 'movie': movie})
 
@@ -162,15 +172,11 @@ for data in data_list:
     tags = ['O'] * len(genre_sentece.split())
     value_list = []
     for genre in genres:
-        value = 'ge_' + genre
+        value = id2genre[int(genre)]
         value_list.append(value)
+        tag_start_index = genre_sentece.split().index('<genres>')
         genre_sentece = genre_sentece.replace('<genres>', value, 1)
         sentence_split = genre_sentece.split()
-        try:
-            tag_start_index = sentence_split.index(value)
-        except Exception as e:
-            print(sentence_split)
-            print(value)
         tags[tag_start_index] = 'B-' + 'genres'
 
     data_json_list.append({'key': genre_sentece, 'value': value_list, 'tags': tags,  'user': user, 'movie': movie})
@@ -178,11 +184,10 @@ for data in data_list:
     data_final.append(data_json_list)
 
 
-with open('/home/next/cr_repo/bf/conv_data/test2.dat', 'w') as q:
+with open('/home/next/cr_repo/bf/conv_data/test_full_entity.dat', 'w') as q:
     for five_sentences in data_final:
         for sentence in five_sentences:
             q.write(json.dumps(sentence) +'\n')
-        # q.write('\n')
 
 
 

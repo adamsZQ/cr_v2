@@ -239,7 +239,7 @@ def bilstm_train(word2id,
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
     # word_embeds = model.embedding
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0, random_state=2)
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.9, random_state=2)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
     print(len(X_train))
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)

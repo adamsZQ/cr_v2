@@ -171,7 +171,7 @@ def simulate(policy, recommender, max_dialength=7, max_recreward=50, r_rec_fail=
                 # print('state_onehot', state_onehot)
                 # print('state_id', state_id)
                 state_onehot = data_tool.sparse_2torch(state_onehot)
-                action = policy.select_best_action(state_onehot, device)
+                action = policy.select_action(state_onehot, device)
                 # print('state', state)
                 #
                 # print('action', action)
@@ -429,13 +429,14 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = os.path.expanduser('~/cr_repo/')
     if file_name is None:
-        file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
-        # file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.883720930232558_0.09302325581395349.m'
+        file_name = 'pre_train/policy_pretrain_5turns_0.2202.pkl'
+        # file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
+        # file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.6744186046511627_0.09302325581395349.m'
     # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
     policy = torch.load(FILE_PREFIX+file_name).to(device)
     data_tool = DataTool()
     recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
-    simulate(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.8)
+    simulate(policy, recommender,  r_q=-1, r_c=-20, r_rec_fail=-1, max_recreward=10)
 
     # val_ave_reward, val_ave_conv, val_accuracy,  val_quit_rating = val(policy, recommender, r_q=-1, r_c=0, r_rec_fail=-1, max_recreward=0.1, max_dialength=7, device=None)
     #

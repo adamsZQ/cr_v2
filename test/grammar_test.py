@@ -31,11 +31,26 @@
 # a = 'sdf_d'
 # v = a.split('_')[1]
 # print(v)
-import numpy as np
+# import numpy as np
+#
+# aa = [2, 3]
+#
+# ttt = []
+# ttt.append([js for js in aa])
+# dididi = np.reshape(aa, (1, 3, 1)).tolist()
+# print(dididi)
+# import numpy as np
+#
+# max_dialength = np.random.choice([5, 4], p=[0.9, 0.1])
+#
+# print(max_dialength)
+# from werkzeug.contrib.cache import SimpleCache
+#
+# cache = SimpleCache()
+# a = cache.get(key='foo')
+# print(a)
+import random
 
-aa = [2, 3]
-
-ttt = []
-ttt.append([js for js in aa])
-dididi = np.reshape(aa, (1, 3, 1)).tolist()
-print(dididi)
+a = [1,2,3,4,5]
+b = random.sample(a, 1)
+print(b[0])

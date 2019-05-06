@@ -83,6 +83,7 @@ class Policy(nn.Module):
         probs = self(state, train=False)
         # print('probs', probs)
         action = torch.argmax(probs, dim=1).tolist()
+
         return action[0]
 
     def update_policy(self, optimizer):
