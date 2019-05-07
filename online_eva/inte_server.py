@@ -199,6 +199,7 @@ def get_bf_result(action, answer):
 
     return id_str, entity_id_list, entity_asked
 
+
 def recommendation(user_id, states, target, recommender, top_k=1):
     target = target
     attributes = {}
