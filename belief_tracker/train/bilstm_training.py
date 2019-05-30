@@ -64,7 +64,7 @@ if __name__ == '__main__':
     if FILE_PREFIX is None:
         FILE_PREFIX = '~/cr_repo/'
     if model_type is None:
-        model_type = 'test_entity_data'
+        model_type = 'test_final'
     if boundary_tags is None:
         boundary_tags = False
 

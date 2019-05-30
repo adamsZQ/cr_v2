@@ -236,10 +236,11 @@ def bilstm_train(word2id,
     device_enable = device
     # model =load_m(model_prefix + 'bilstm_crf_0.0789.pkl')
     model = BiLSTM_CRF(len(word2id), tag2id, word_embeddings[0].size, HIDDEN_DIM).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-4)
     word_embeds = word_embeds.to(device)
     # word_embeds = model.embedding
-    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.9, random_state=2)
+    print(len(sentences_prepared))
+    X_train, X_test, y_train, y_test = train_test_split(sentences_prepared, tag_prepared, test_size=0.96, random_state=2)
     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
     print(len(X_train))
     X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=1)

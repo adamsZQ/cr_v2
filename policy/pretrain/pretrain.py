@@ -15,7 +15,7 @@ import torch.utils.data as Data
 
 from policy.policy_rl import Policy
 
-data_file = '/home/next/cr_repo/pre_train/pretrain_data_3turns.h5'
+data_file = '/home/next/cr_repo/pre_train/pretrain_data_5turns.h5'
 f = h5py.File(data_file, 'r')
 states = f['states'][:]
 actions = f['actions'][:]
@@ -52,7 +52,7 @@ loader = Data.DataLoader(dataset=torch_dataset, batch_size=batch_size)
 
 policy = Policy(input_size, output_size)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(policy.parameters(), lr=1e-2)
+optimizer = optim.Adam(policy.parameters(), lr=1e-4)
 
 
 def train(model_prefix, file_name):
@@ -100,7 +100,7 @@ def val(X_val, y_val):
     predict_list = binarizer.transform(predict_list)
 
     accuracy = accuracy_score(target_list, predict_list)
-    f1 = f1_score(target_list, predict_list, average="weighted")
+    f1 = f1_score(target_list, predict_list, average="macro")
     precision = precision_score(target_list, predict_list, average="macro")
     recall = recall_score(target_list, predict_list, average="macro")
 
@@ -137,8 +137,8 @@ def save_model(model, file_prefix=None, file_name=None, val_loss='None', best_lo
 
 
 if __name__ == '__main__':
-    FILE_PREFIX = '/home/next/cr_repo/pre_train/'
-    file_name = 'policy_pretrain_3turns'
+    FILE_PREFIX = '/home/next/cr_repo/pre_train/test'
+    file_name = 'policy_pretrain_5turns'
     train(FILE_PREFIX, file_name)
 
     # policy = torch.load(FILE_PREFIX+file_name)

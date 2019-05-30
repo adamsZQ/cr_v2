@@ -68,10 +68,11 @@ word_embeds_weight = torch.load(embedding_path)
 word_embeds = nn.Embedding.from_pretrained(word_embeds_weight, freeze=True)
 
 # get part of datalist
-X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.96, random_state=1)
-X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
-print(len(X_train))
-X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
+# X_train, X_test, y_train, y_test = train_test_split(data_zipped, tag_chunk, test_size=0.96, random_state=1)
+# X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=1)
+# print(len(X_train))
+# X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=2)
+
 
 actions = ['director', 'genres', 'critic_rating', 'country', 'audience_rating', 'recommendation']
 # question sequence in training data
@@ -119,7 +120,36 @@ with open('/home/next/cr_repo/entity_id/genre_id.json', 'r') as f:
     genre2id = json.load(f)
 id2genre = {value: key for key, value in genre2id.items()}
 
+# movie_rating_list = []
+# question_sequence = ['country', 'director', 'audience_rating', 'critic_rating', 'genres']
+data_sentence_list = []
+with open('/home/next/cr_repo/movie_rating', 'r') as m:
+    for line in m:
+        data_json = json.loads(line)
+        data_sentence = {}
+        five_sentences = ['which country do you like?', 'which director do you like', 'what audience rating do you like?',
+                          'what critic rating do you like>', 'which genres do you like?']
+        # data_sentence['origin'] = data_json
+        data_sentence['user'] = data_json['user']
+        data_sentence['movie'] = data_json['movie']
 
+        data_json['country'] = id2country[data_json['country']]
+        data_json['director'] = id2director[data_json['director']]
+
+        genres_array = data_json['genres'].split('|')
+        genres_list = []
+        genres_str = ''
+        for genre in genres_array:
+            genre_entity = id2genre[int(genre)]
+
+            genres_str = genres_str + '|' + genre_entity
+
+        data_json['genres'] = genres_str
+
+        data_sentence['origin'] = data_json
+        data_sentence['five_sentences'] = five_sentences
+
+        data_sentence_list.append(data_sentence)
 
 def get_bf_result(action, answer):
     entity_asked = actions[action]
@@ -320,17 +350,17 @@ def get_result(answer):
         state_id = [-1] * len(data_id)
         i = 0
 
-        data = random.sample(X_val, 1)
+        data = random.sample(data_sentence_list, 1)
         data = data[0]
         action = select_action(i, state_str)
 
         entity_asked = actions[action]
-        print('you are asked:', entity_asked)
+        print('data is ', data['origin'])
         five_sentences = data['five_sentences']
         entity2question = {question_sequence[index]: five_sentences[index] for index in range(5)}
         data_answer = entity2question[entity_asked]
-        data_answer_word = [id2word[word] for word in data_answer]
-        print('data is ', data_answer_word)
+        # data_answer_word = [id2word[word] for word in data_answer]
+        print(data_answer)
 
         cache.set('data', data)
         cache.set('action', action)
@@ -339,7 +369,8 @@ def get_result(answer):
         cache.set('completed', False)
         cache.set('i', i)
 
-        return 'you are asked:{},data is:{}'.format(entity_asked, data_answer_word)
+        # return 'you are asked:{},data is:{}'.format(entity_asked, data_answer)
+        return 'data is {},\n\n question is {}?'.format(data['origin'], data_answer)
     elif completed_flag is False:
         data = cache.get('data')
         action = cache.get('action')
@@ -370,12 +401,12 @@ def get_result(answer):
 
         if action in range(5):
             entity_asked = actions[action]
-            print('you are asked:', entity_asked)
+            # print('you are asked:', entity_asked)
             data_answer = entity2question[entity_asked]
-            data_answer_word = [id2word[word] for word in data_answer]
-            print('data is ', data_answer_word)
+            # data_answer_word = [id2word[word] for word in data_answer]
+            print('data is ', data_answer)
 
-            return 'you are asked:{},data is:{}'.format(entity_asked, data_answer_word)
+            return data_answer + '?'
         else:
             user = data['user']
             movie = data['movie']
