@@ -29,7 +29,7 @@ class Glove_Embeddings():
 
     def get_glove_embeddings(self):
         # get pretrained glove embeddings
-        f = h5py.File(self.file_prefix + 'bf/embeddings/glove.840B.300d.h5', 'r')
+        f = h5py.File(self.file_prefix + 'embeddings/glove.840B.300d.h5', 'r')
         embeddings = f['embedding']
         words_flatten = f['words_flatten']
 

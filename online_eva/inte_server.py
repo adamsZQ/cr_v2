@@ -27,7 +27,7 @@ model_type = None
 boundary_tags = None
 
 if FILE_PREFIX is None:
-    FILE_PREFIX = '~/cr_repo/'
+    FILE_PREFIX = '~/cr_repo/final_edition/'
 if model_type is None:
     model_type = 'test_entity_data'
 if boundary_tags is None:
@@ -39,7 +39,7 @@ bf_prefix = 'bf/'
 
 FILE_PREFIX = os.path.expanduser(FILE_PREFIX)
 
-data_path = bf_prefix + model_type + '/training_data'
+data_path = 'training_data'
 sentences_data, tag_data, user_list, movie_list = (get_simulate_data(FILE_PREFIX, data_path))
 
 # get word embeddings
@@ -60,10 +60,10 @@ data_zipped = zip_data(sentences_prepared, user_list, movie_list)
 tag_chunk = chunks(tag_prepared, 5)
 
 # load bf model
-model_path = '/home/next/cr_repo/bf/test_entity_data/bilstm_crf_0.0001.pkl'
+model_path = '/home/next/cr_repo/final_edition/bilstm_crf_0.0001.pkl'
 bf_model = load_model(model_path)
 # TODO load word embedding
-embedding_path = '/home/next/cr_repo/bf/test_entity_data/embedding0.00011859582542694813_enforcement.pkl'
+embedding_path = '/home/next/cr_repo/final_edition/embedding0.00011859582542694813_enforcement.pkl'
 word_embeds_weight = torch.load(embedding_path)
 word_embeds = nn.Embedding.from_pretrained(word_embeds_weight, freeze=True)
 
@@ -101,7 +101,7 @@ for data in data_list:
     id_genres_list[movie_id] = genres
 
 
-with open('/home/next/cr_repo/entity2id.dat', 'r') as f:
+with open('/home/next/cr_repo/final_edition/entity2id.dat', 'r') as f:
     entity2id = json.load(f)
 
 id2entity = {value: key for key, value in entity2id.items()}
@@ -110,20 +110,20 @@ def get_genres(movie_id):
     return id_genres_list[movie_id]
 
 
-with open('/home/next/cr_repo/entity_id/director_id.json', 'r') as f:
+with open('/home/next/cr_repo/final_edition/entity_id/director_id.json', 'r') as f:
     director2id = json.load(f)
 id2director = {value: key for key, value in director2id.items()}
-with open('/home/next/cr_repo/entity_id/country_id.json', 'r') as f:
+with open('/home/next/cr_repo/final_edition/entity_id/country_id.json', 'r') as f:
     country2id = json.load(f)
 id2country = {value: key for key, value in country2id.items()}
-with open('/home/next/cr_repo/entity_id/genre_id.json', 'r') as f:
+with open('/home/next/cr_repo/final_edition/entity_id/genre_id.json', 'r') as f:
     genre2id = json.load(f)
 id2genre = {value: key for key, value in genre2id.items()}
 
 # movie_rating_list = []
 # question_sequence = ['country', 'director', 'audience_rating', 'critic_rating', 'genres']
 data_sentence_list = []
-with open('/home/next/cr_repo/movie_rating', 'r') as m:
+with open('/home/next/cr_repo/final_edition/movie_rating', 'r') as m:
     for line in m:
         data_json = json.loads(line)
         data_sentence = {}
@@ -300,15 +300,17 @@ FILE_PREFIX = args.prefix
 file_name = args.file_name
 
 if FILE_PREFIX is None:
-    FILE_PREFIX = os.path.expanduser('~/cr_repo/')
+    FILE_PREFIX = os.path.expanduser('~/cr_repo/final_edition/')
 if file_name is None:
-    file_name = 'simulate/rl_stand_model0.7185185185185186_3.2666666666666666_0.08888888888888889.m'
+    file_name = 'rl_stand_model_final.m'
+
+    # file_name = 'rl_stand_model0.7185185185185186_3.2666666666666666_0.08888888888888889.m'
     # file_name = 'simulate/best_1/rl_model0.7764705882352941_3.223529411764706_0.011764705882352941.m'
     # file_name = 'simulate/best_1/rl_stand_model0.7209302325581395_3.6744186046511627_0.09302325581395349.m'
 # file_name = '5turns/po    licy_pretrain_1.5979.pkl'
 policy = torch.load(FILE_PREFIX + file_name).to(device)
 data_tool = DataTool()
-recommender = KNN(FILE_PREFIX, 'recommend/knn_model.m', 'ratings_cleaned.dat')
+recommender = KNN(FILE_PREFIX, 'knn_model.m', 'ratings_cleaned.dat')
 
 r_q = -1
 r_c = -20
